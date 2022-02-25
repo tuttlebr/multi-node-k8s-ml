@@ -1,0 +1,32 @@
+appPrefix: tensorflow-distributed
+
+replicaCount: 2
+
+service:
+  nodePort: 30600
+
+resources:
+  limits:
+    nvidia.com/gpu: 1
+
+tensorboardNode: olympus-01
+
+imageCredentials:
+  registry: nvcr.io
+  username: $oauthtoken
+  password: "api-key"
+  email: "user@nvidia.com"
+
+baseImage:
+  repository: nvcr.io/nvidia/tensorflow
+  pullPolicy: IfNotPresent
+  tag: "22.01-tf2-py3"
+  imagePullSecrets:
+    - ngc-secret
+ 
+nfs:
+  path: /volume1/brandon/distributed-training-sc
+  server: 192.168.1.232
+
+persistentVolume:
+  storage: 128Gi

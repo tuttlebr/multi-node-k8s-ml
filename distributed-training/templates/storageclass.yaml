@@ -1,0 +1,10 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: {{ .Values.appPrefix }}-sc
+  labels:
+    app: {{ .Values.appPrefix }}
+provisioner: k8s-sigs.io/nfs-subdir-external-provisioner
+parameters:
+  pathPattern: "${.PVC.namespace}-${.PVC.name}"
+  archiveOnDelete: "false"

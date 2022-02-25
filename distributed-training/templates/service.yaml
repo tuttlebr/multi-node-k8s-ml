@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.appPrefix }}
+  labels:
+    app: {{ .Values.appPrefix }}
+spec:
+  type: NodePort
+  ports:
+    - name: tensorboard
+      nodePort: {{ .Values.service.nodePort }}
+      port: 6006
+      protocol: TCP
+      targetPort: 6006
+  selector:
+    app: {{ .Values.appPrefix }}

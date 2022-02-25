@@ -1,0 +1,148 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ .Values.appPrefix }}-workers
+  labels:
+    app: {{ .Values.appPrefix }}
+    run: {{ .Values.appPrefix }}-workers
+spec:
+  selector:
+    matchLabels:
+      app: {{ .Values.appPrefix }}
+  serviceName: {{ .Values.appPrefix }}-workers
+  replicas: {{ .Values.replicaCount }}
+  template:
+    metadata:
+      labels: 
+        app: {{ .Values.appPrefix }}
+        run: {{ .Values.appPrefix }}-workers
+    spec:
+      affinity: {{- toYaml .Values.nodeAffinity | nindent 12 }}
+      imagePullSecrets:
+        - name: ngc-secret
+      subdomain: {{ .Values.appPrefix }}
+      containers:
+        - name: {{ .Values.appPrefix }}-workers
+          image: "{{ .Values.baseImage.repository }}:{{ .Values.baseImage.tag }}"
+          imagePullPolicy: {{ .Values.baseImage.pullPolicy }}
+          ports:
+            - name: gcrp
+              containerPort: 4242
+              protocol: TCP
+          command: [ "sh", "-c"]
+          args:
+          - while true; do
+              echo -en '\n';
+              echo "App Name - $APP_NAME";
+              echo "Node Name - $MY_NODE_NAME";
+              echo "Pod Name - $MY_POD_NAME"; 
+              echo "Pod Namespace - $MY_POD_NAMESPACE";
+              echo "Pod IP - $MY_POD_IP";
+              echo "Pod Service Account - $MY_POD_SERVICE_ACCOUNT";
+              echo "CPU Request - $MY_CPU_REQUEST";
+              echo "CPU Limit - $MY_CPU_LIMIT";
+              echo "Memory Request - $MY_MEM_REQUEST";
+              echo "Memory Limit - $MY_MEM_LIMIT";
+              sleep infinity;
+            done;
+          env:
+            - name: MY_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: MY_POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: MY_POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: MY_POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: MY_POD_SERVICE_ACCOUNT
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.serviceAccountName
+            - name: MY_CPU_REQUEST
+              valueFrom:
+                resourceFieldRef:
+                  containerName: {{ .Values.appPrefix }}-workers
+                  resource: requests.cpu
+            - name: MY_CPU_LIMIT
+              valueFrom:
+                resourceFieldRef:
+                  containerName: {{ .Values.appPrefix }}-workers
+                  resource: limits.cpu
+            - name: MY_MEM_REQUEST
+              valueFrom:
+                resourceFieldRef:
+                  containerName: {{ .Values.appPrefix }}-workers
+                  resource: requests.memory
+            - name: MY_MEM_LIMIT
+              valueFrom:
+                resourceFieldRef:
+                  containerName: {{ .Values.appPrefix }}-workers
+                  resource: limits.memory
+            - name: APP_NAME
+              value: {{ .Values.appPrefix }}
+          volumeMounts:
+            - name: dshm
+              mountPath: /dev/shm
+            - name: {{ .Values.appPrefix }}-storage
+              mountPath: /workspace
+          resources: {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: dshm
+          emptyDir: {}
+        - name: {{ .Values.appPrefix }}-storage
+          persistentVolumeClaim:
+            claimName: {{ .Values.appPrefix }}-pvc
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ .Values.appPrefix }}-tensorboard
+  labels:
+    app: {{ .Values.appPrefix }}
+    run: {{ .Values.appPrefix }}-tensorboard
+spec:
+  selector:
+    matchLabels:
+      app: {{ .Values.appPrefix }}
+      run: {{ .Values.appPrefix }}-tensorboard
+  serviceName: {{ .Values.appPrefix }}-tensorboard
+  replicas: 1
+  template:
+    metadata:
+      labels: 
+        app: {{ .Values.appPrefix }}
+        run: {{ .Values.appPrefix }}-tensorboard
+    spec:
+      nodeName: {{ .Values.tensorboardNode }}
+      imagePullSecrets:
+        - name: ngc-secret
+      subdomain: {{ .Values.appPrefix }}
+      containers:
+        - name: {{ .Values.appPrefix }}-tensorboard
+          image: "{{ .Values.baseImage.repository }}:{{ .Values.baseImage.tag }}"
+          imagePullPolicy: {{ .Values.baseImage.pullPolicy }}
+          ports:
+            - name: tensorboard
+              containerPort: 6006
+              protocol: TCP
+          command: ["/bin/bash"]
+          args: ["-c", "mkdir -p /workspace/tensorboard/{{ .Values.appPrefix }} && tensorboard --logdir=/workspace/tensorboard/{{ .Values.appPrefix }}"]
+          volumeMounts:
+            - name: dshm
+              mountPath: /dev/shm
+            - name: {{ .Values.appPrefix }}-storage
+              mountPath: /workspace
+      volumes:
+        - name: dshm
+          emptyDir: {}
+        - name: {{ .Values.appPrefix }}-storage
+          persistentVolumeClaim:
+            claimName: {{ .Values.appPrefix }}-pvc
