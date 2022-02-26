@@ -17,8 +17,8 @@ Kick off your job across nodes:
 
 #/bin/bash
 export APP_NAME={{ .Values.appPrefix }}
-export WORKER_IPS=$(kubectl get pods -l run=$APP_NAME-workers -o jsonpath='{range .items[*]}{.status.podIP}{":4242 "}{end}' | xargs)
-export PORT=4242
+export WORKER_IPS=$(kubectl get pods -l run=$APP_NAME-workers -o jsonpath='{range .items[*]}{.status.podIP}{":5005 "}{end}' | xargs)
+export PORT=5005
 export INDEX=0
 export GRPC_ARRAY=$(sed 's/ /\, /g' <<< $WORKER_IPS)
 

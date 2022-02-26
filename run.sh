@@ -1,14 +1,36 @@
 #/bin/bash
 
+# TF Example:
+## Node 1
+# TF_CONIG='{"cluster": {"worker": ["10.233.68.1:5005", "10.233.66.110:5005"]}, "task": {"index": 0, "type": "worker"}}' python worker.py
+## Node 2
+# TF_CONIG='{"cluster": {"worker": ["10.233.68.1:5005", "10.233.66.110:5005"]}, "task": {"index": 1, "type": "worker"}}' python worker.py
+clear
 export APP_NAME=tensorflow-distributed
-export WORKER_IPS=$(kubectl get pods -l run=$APP_NAME-workers -o jsonpath='{range .items[*]}{.status.podIP}{":4242 "}{end}' | xargs)
-export PORT=4242
+export WORKER_IPS=$(kubectl get pods -l run=$APP_NAME-workers -o jsonpath='{range .items[*]}{.status.podIP}{":5005 "}{end}' | xargs)
+export PORT=5005
 export INDEX=0
-export GRPC_ARRAY=$(sed 's/ /\, /g' <<< $WORKER_IPS)
+export WORKER_TYPE="chief"
+
+GRPC_ARRAY=()
+for IP in $WORKER_IPS;
+    do
+        GRPC_ARRAY+="$IP,"
+    done
+
+export GRPC_ARRAY=$(sed 's/,*$//g' <<< $GRPC_ARRAY)
 
 for i in $WORKER_IPS;
-
 do
-    kubectl exec pod/$APP_NAME-workers-$INDEX -- sh -c "TF_CONFIG='{"cluster": {"worker": [$GRPC_ARRAY]}, "task": {"index": $INDEX, "type": "worker"}}'; python3 worker.py" &
+    TF_CONFIG=$( jq -n \
+                    --arg workers "$GRPC_ARRAY" \
+                    --arg index "$INDEX" \
+                    --arg worker_type $WORKER_TYPE \
+                    '{cluster: {worker: [$workers|split(",")]}, task: {index: $index, type: $worker_type}}'
+                    )
+
+    echo "$TF_CONFIG"
+    # kubectl exec pod/$APP_NAME-workers-$INDEX -- sh -c "TF_CONFIG=$TF_CONFIG; python3 worker.py"
     INDEX=$(($INDEX+1));
+    WORKER_TYPE="worker";
 done

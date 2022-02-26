@@ -20,14 +20,14 @@ spec:
       affinity: {{- toYaml .Values.nodeAffinity | nindent 12 }}
       imagePullSecrets:
         - name: ngc-secret
-      subdomain: {{ .Values.appPrefix }}
+      subdomain: {{ .Values.appPrefix }}-subdomain
       containers:
         - name: {{ .Values.appPrefix }}-workers
           image: "{{ .Values.baseImage.repository }}:{{ .Values.baseImage.tag }}"
           imagePullPolicy: {{ .Values.baseImage.pullPolicy }}
           ports:
             - name: gcrp
-              containerPort: 4242
+              containerPort: 5005
               protocol: TCP
           command: [ "sh", "-c"]
           args:
@@ -136,13 +136,9 @@ spec:
           command: ["/bin/bash"]
           args: ["-c", "mkdir -p /workspace/tensorboard/{{ .Values.appPrefix }} && tensorboard --logdir=/workspace/tensorboard/{{ .Values.appPrefix }}"]
           volumeMounts:
-            - name: dshm
-              mountPath: /dev/shm
             - name: {{ .Values.appPrefix }}-storage
               mountPath: /workspace
       volumes:
-        - name: dshm
-          emptyDir: {}
         - name: {{ .Values.appPrefix }}-storage
           persistentVolumeClaim:
             claimName: {{ .Values.appPrefix }}-pvc
