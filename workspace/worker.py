@@ -4,12 +4,19 @@ from __future__ import (
     print_function,
     unicode_literals,
 )
-import tensorflow as tf
-import os
-import json
-import datetime
 
+import datetime
+import json
+import os
+
+import numpy as np
+import tensorflow as tf
+from keras import backend
+from keras.datasets.cifar import load_batch
+from keras.utils.data_utils import get_file
 from tensorflow import keras
+from tensorflow.python.util.tf_export import keras_export
+
 import resnet as resnet
 
 """
@@ -20,13 +27,14 @@ For example:
 export TF_CONFIG='{"cluster": {"worker": ["10.1.10.58:12345", "10.1.10.250:12345"]}, "task": {"index": 0, "type": "worker"}}'
 """
 
-communication_options = tf.distribute.experimental.CommunicationOptions(
-    implementation=tf.distribute.experimental.CommunicationImplementation.NCCL
-)
-strategy = tf.distribute.MultiWorkerMirroredStrategy(
-    communication_options=communication_options
-)
-
+# communication_options = tf.distribute.experimental.CommunicationOptions(
+#     implementation=tf.distribute.experimental.CommunicationImplementation.NCCL
+# )
+# strategy = tf.distribute.MultiWorkerMirroredStrategy(
+#     communication_options=communication_options
+# )
+## - or -
+strategy = tf.distribute.MultiWorkerMirroredStrategy()
 
 NUM_GPUS = 2
 BS_PER_GPU = 128
@@ -66,7 +74,46 @@ def schedule(epoch):
     return learning_rate
 
 
-(x, y), (x_test, y_test) = keras.datasets.cifar10.load_data()
+def load_dataset():
+    dirname = "cifar-10-batches-py"
+    origin = "https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz"
+    path = get_file(
+        dirname,
+        origin=origin,
+        untar=True,
+        file_hash="6d958be074577803d12ecdefd02955f39262c83c16fe9348329d7fe0b5c001ce",
+        cache_dir="/workspace",
+    )
+
+    num_train_samples = 50000
+
+    x_train = np.empty((num_train_samples, 3, 32, 32), dtype="uint8")
+    y_train = np.empty((num_train_samples,), dtype="uint8")
+
+    for i in range(1, 6):
+        fpath = os.path.join(path, "data_batch_" + str(i))
+        (
+            x_train[(i - 1) * 10000 : i * 10000, :, :, :],
+            y_train[(i - 1) * 10000 : i * 10000],
+        ) = load_batch(fpath)
+
+    fpath = os.path.join(path, "test_batch")
+    x_test, y_test = load_batch(fpath)
+
+    y_train = np.reshape(y_train, (len(y_train), 1))
+    y_test = np.reshape(y_test, (len(y_test), 1))
+
+    if backend.image_data_format() == "channels_last":
+        x_train = x_train.transpose(0, 2, 3, 1)
+        x_test = x_test.transpose(0, 2, 3, 1)
+
+    x_test = x_test.astype(x_train.dtype)
+    y_test = y_test.astype(y_train.dtype)
+
+    return (x_train, y_train), (x_test, y_test)
+
+
+(x, y), (x_test, y_test) = load_dataset()
 
 train_dataset = tf.data.Dataset.from_tensor_slices((x, y))
 test_dataset = tf.data.Dataset.from_tensor_slices((x_test, y_test))

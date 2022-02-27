@@ -10,7 +10,6 @@ export APP_NAME=tensorflow-distributed
 export WORKER_IPS=$(kubectl get pods -l run=$APP_NAME-workers -o jsonpath='{range .items[*]}{.status.podIP}{":5005 "}{end}' | xargs)
 export PORT=5005
 export INDEX=0
-export WORKER_TYPE="chief"
 
 GRPC_ARRAY=()
 for IP in $WORKER_IPS;
@@ -22,15 +21,12 @@ export GRPC_ARRAY=$(sed 's/,*$//g' <<< $GRPC_ARRAY)
 
 for i in $WORKER_IPS;
 do
-    TF_CONFIG=$( jq -n \
+    TF_CONFIG=$( jq -c -n \
                     --arg workers "$GRPC_ARRAY" \
                     --arg index "$INDEX" \
-                    --arg worker_type $WORKER_TYPE \
-                    '{cluster: {worker: [$workers|split(",")]}, task: {index: $index, type: $worker_type}}'
+                    '{cluster: {worker: $workers|split(",")}, task: {index: $index, type: "worker"}}'
                     )
+    echo "TF_CONFIG='$TF_CONFIG' python3 worker.py"
 
-    echo "$TF_CONFIG"
-    # kubectl exec pod/$APP_NAME-workers-$INDEX -- sh -c "TF_CONFIG=$TF_CONFIG; python3 worker.py"
     INDEX=$(($INDEX+1));
-    WORKER_TYPE="worker";
 done

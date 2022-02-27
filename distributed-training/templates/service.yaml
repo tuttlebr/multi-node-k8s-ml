@@ -13,7 +13,7 @@ spec:
       protocol: TCP
       targetPort: 6006
   selector:
-    name: {{ .Values.appPrefix }}-tensorboard
+    app: {{ .Values.appPrefix }}
 ---
 apiVersion: v1
 kind: Service

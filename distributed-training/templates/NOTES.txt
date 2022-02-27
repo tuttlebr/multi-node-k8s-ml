@@ -13,19 +13,38 @@ You can monitor the application by running the following kubelet command:
 Get your worker pod IP addresses like this:
 NODE_IPS = kubectl get pods -l run={{ .Values.appPrefix }}-workers -o jsonpath='{range .items[*]}{.status.podIP}{" "}{end}'
 
-Kick off your job across nodes:
+Run the script below on a machine with kubectl access to get a TF_CONFIG example:
 
 #/bin/bash
+
+# TF Example:
+## Node 1
+# TF_CONIG='{"cluster": {"worker": ["10.233.68.1:5005", "10.233.66.110:5005"]}, "task": {"index": 0, "type": "worker"}}' python worker.py
+## Node 2
+# TF_CONIG='{"cluster": {"worker": ["10.233.68.1:5005", "10.233.66.110:5005"]}, "task": {"index": 1, "type": "worker"}}' python worker.py
+
 export APP_NAME={{ .Values.appPrefix }}
 export WORKER_IPS=$(kubectl get pods -l run=$APP_NAME-workers -o jsonpath='{range .items[*]}{.status.podIP}{":5005 "}{end}' | xargs)
 export PORT=5005
 export INDEX=0
-export GRPC_ARRAY=$(sed 's/ /\, /g' <<< $WORKER_IPS)
+
+GRPC_ARRAY=()
+for IP in $WORKER_IPS;
+    do
+        GRPC_ARRAY+="$IP,"
+    done
+
+export GRPC_ARRAY=$(sed 's/,*$//g' <<< $GRPC_ARRAY)
 
 for i in $WORKER_IPS;
-
 do
-    kubectl exec pod/$APP_NAME-workers-$INDEX -- sh -c "TF_CONFIG='{"cluster": {"worker": [$GRPC_ARRAY]}, "task": {"index": $INDEX, "type": "worker"}}'; python3 worker.py" &
+    TF_CONFIG=$( jq -c -n \
+                    --arg workers "$GRPC_ARRAY" \
+                    --arg index "$INDEX" \
+                    '{cluster: {worker: $workers|split(",")}, task: {index: $index, type: "worker"}}'
+                    )
+    echo "TF_CONFIG='$TF_CONFIG' python3 worker.py"
+
     INDEX=$(($INDEX+1));
 done
 --------------------------------------------------------------------------------

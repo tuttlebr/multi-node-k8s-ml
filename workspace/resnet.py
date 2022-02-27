@@ -19,15 +19,12 @@
     https://arxiv.org/abs/1512.03385)
 Adapted from code contributed by BigMoyan.
 """
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 
 import functools
-import tensorflow as tf
-from tensorflow.python.keras import backend
-from tensorflow.python.keras import layers
 
+import tensorflow as tf
+from tensorflow.python.keras import backend, layers
 
 BATCH_NORM_DECAY = 0.997
 BATCH_NORM_EPSILON = 1e-5
