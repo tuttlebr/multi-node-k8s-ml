@@ -29,6 +29,9 @@ spec:
             - name: gcrp
               containerPort: 5005
               protocol: TCP
+            - name: profiler-port
+              containerPort: 2223
+              protocol: TCP
           command: [ "sh", "-c"]
           args:
           - while true; do
@@ -134,7 +137,7 @@ spec:
               containerPort: 6006
               protocol: TCP
           command: ["/bin/bash"]
-          args: ["-c", "mkdir -p /workspace/tensorboard/{{ .Values.appPrefix }} && tensorboard --logdir=/workspace/tensorboard/{{ .Values.appPrefix }}"]
+          args: ["-c", "pip install -U tensorboard-plugin-profile && mkdir -p /workspace/tensorboard/{{ .Values.appPrefix }} && tensorboard --logdir=/workspace/tensorboard/{{ .Values.appPrefix }} --bind_all"]
           volumeMounts:
             - name: {{ .Values.appPrefix }}-storage
               mountPath: /workspace

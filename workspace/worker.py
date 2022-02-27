@@ -140,9 +140,9 @@ log_dir = os.path.join(
     app_dir, datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 )
 tensorboard_callback = tf.keras.callbacks.TensorBoard(
-    log_dir=log_dir, histogram_freq=1
+    log_dir=log_dir, histogram_freq=1, update_freq=1, profile_batch='10, 20'
 )
-
+tf.profiler.experimental.server.start(6006)
 with strategy.scope():
     model = resnet.resnet56(img_input=img_input, classes=NUM_CLASSES)
     model.compile(

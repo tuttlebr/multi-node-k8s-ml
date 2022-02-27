@@ -28,5 +28,9 @@ spec:
       port: 5005
       protocol: TCP
       targetPort: 5005
+    - name: profiler-port
+      port: 2223
+      protocol: TCP
+      targetPort: 2223
   selector:
     name: {{ .Values.appPrefix }}-workers
