@@ -25,6 +25,9 @@ import functools
 
 import tensorflow as tf
 from tensorflow.python.keras import backend, layers
+from tensorflow.keras import mixed_precision
+
+mixed_precision.set_global_policy("mixed_float16")
 
 BATCH_NORM_DECAY = 0.997
 BATCH_NORM_EPSILON = 1e-5
@@ -319,6 +322,7 @@ def resnet(num_blocks, img_input=None, classes=10, training=None):
         kernel_regularizer=tf.keras.regularizers.l2(L2_WEIGHT_DECAY),
         bias_regularizer=tf.keras.regularizers.l2(L2_WEIGHT_DECAY),
         name="fc10",
+        dtype="float32",
     )(x)
 
     inputs = img_input
