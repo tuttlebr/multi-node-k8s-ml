@@ -1,6 +1,7 @@
 appPrefix: tensorflow-distributed
 
 replicaCount: 2
+gpuPerReplica: 1
 
 service:
   nodePort: 30600

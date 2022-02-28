@@ -36,9 +36,9 @@ strategy = tf.distribute.MultiWorkerMirroredStrategy(
 )
 ## - or -
 # strategy = tf.distribute.MultiWorkerMirroredStrategy()
-mixed_precision.set_global_policy('mixed_float16')
+mixed_precision.set_global_policy("mixed_float16")
 
-NUM_GPUS = 2
+NUM_GPUS = int(os.getenv("N_NODE")) * int(os.getenv("N_GPU"))
 BS_PER_GPU = 128
 NUM_EPOCHS = 60
 
@@ -142,7 +142,7 @@ log_dir = os.path.join(
     app_dir, datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 )
 tensorboard_callback = tf.keras.callbacks.TensorBoard(
-    log_dir=log_dir, histogram_freq=1, update_freq=1, profile_batch='10, 20'
+    log_dir=log_dir, histogram_freq=1, update_freq=1, profile_batch="10, 20"
 )
 tf.profiler.experimental.server.start(6006)
 with strategy.scope():

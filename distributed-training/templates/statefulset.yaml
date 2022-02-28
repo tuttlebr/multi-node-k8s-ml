@@ -49,6 +49,10 @@ spec:
               sleep infinity;
             done;
           env:
+            - name: N_NODE
+              value: "{{ .Values.replicaCount }}"
+            - name: N_GPU
+              value: "{{ .Values.gpuPerReplica }}"
             - name: TF_GPU_THREAD_MODE
               value: gpu_private
             - name: MY_NODE_NAME
