@@ -39,7 +39,7 @@ strategy = tf.distribute.MultiWorkerMirroredStrategy(
 mixed_precision.set_global_policy("mixed_float16")
 
 NUM_GPUS = int(os.getenv("N_NODE")) * int(os.getenv("N_GPU"))
-BS_PER_GPU = 128
+BS_PER_GPU = 256
 NUM_EPOCHS = 60
 
 HEIGHT = 32
@@ -141,6 +141,12 @@ app_dir = os.path.join("/workspace/tensorboard", APP_NAME)
 log_dir = os.path.join(
     app_dir, datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 )
+
+file_writer = tf.summary.create_file_writer(log_dir)
+with file_writer.as_default():
+  images = x[0:25]
+  tf.summary.image("25 training data examples", images, max_outputs=25, step=0)
+
 tensorboard_callback = tf.keras.callbacks.TensorBoard(
     log_dir=log_dir, histogram_freq=1, update_freq=1, profile_batch="10, 20"
 )
