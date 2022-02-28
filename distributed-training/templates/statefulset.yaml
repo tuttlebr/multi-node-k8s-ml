@@ -49,6 +49,8 @@ spec:
               sleep infinity;
             done;
           env:
+            - name: TF_GPU_THREAD_MODE
+              value: gpu_private
             - name: MY_NODE_NAME
               valueFrom:
                 fieldRef:

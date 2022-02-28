@@ -16,6 +16,7 @@ from keras.datasets.cifar import load_batch
 from keras.utils.data_utils import get_file
 from tensorflow import keras
 from tensorflow.python.util.tf_export import keras_export
+from tensorflow.keras import mixed_precision
 
 import resnet as resnet
 
@@ -27,14 +28,15 @@ For example:
 export TF_CONFIG='{"cluster": {"worker": ["10.1.10.58:12345", "10.1.10.250:12345"]}, "task": {"index": 0, "type": "worker"}}'
 """
 
-# communication_options = tf.distribute.experimental.CommunicationOptions(
-#     implementation=tf.distribute.experimental.CommunicationImplementation.NCCL
-# )
-# strategy = tf.distribute.MultiWorkerMirroredStrategy(
-#     communication_options=communication_options
-# )
+communication_options = tf.distribute.experimental.CommunicationOptions(
+    implementation=tf.distribute.experimental.CommunicationImplementation.NCCL
+)
+strategy = tf.distribute.MultiWorkerMirroredStrategy(
+    communication_options=communication_options
+)
 ## - or -
-strategy = tf.distribute.MultiWorkerMirroredStrategy()
+# strategy = tf.distribute.MultiWorkerMirroredStrategy()
+mixed_precision.set_global_policy('mixed_float16')
 
 NUM_GPUS = 2
 BS_PER_GPU = 128
