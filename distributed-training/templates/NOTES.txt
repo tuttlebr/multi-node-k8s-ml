@@ -1,10 +1,10 @@
 --------------------------------------------------------------------------------
 Installation Complete!
-    App:          {{ .Values.appPrefix }} 
-    tensorboardURL:   http://{{ .Values.tensorboardNode }}:{{ .Values.service.nodePort }}
-    baseImage:    {{ .Values.baseImage.repository }} 
-    replicaCount: {{ .Values.replicaCount }} 
-    resources:    {{- toYaml .Values.resources | nindent 12 }}
+    App:            {{ .Values.appPrefix }} 
+    tensorboardURL: http://{{ .Values.tensorboardNode }}:{{ .Values.service.nodePort }}
+    baseImage:      {{ .Values.baseImage.repository }} 
+    replicaCount:   {{ .Values.replicaCount }} 
+    resources:      {{- toYaml .Values.resources | nindent 12 }}
 
 
 You can monitor the application by running the following kubelet command:
