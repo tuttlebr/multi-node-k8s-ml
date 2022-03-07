@@ -105,7 +105,8 @@ spec:
           resources: {{- toYaml .Values.resources | nindent 12 }}
       volumes:
         - name: dshm
-          emptyDir: {}
+          emptyDir:
+            medium: Memory
         - name: {{ .Values.appPrefix }}-storage
           persistentVolumeClaim:
             claimName: {{ .Values.appPrefix }}-pvc
@@ -136,7 +137,7 @@ spec:
       subdomain: {{ .Values.appPrefix }}
       containers:
         - name: {{ .Values.appPrefix }}-tensorboard
-          image: "{{ .Values.baseImage.repository }}:{{ .Values.baseImage.tag }}"
+          image: "nvcr.io/nvidia/tensorflow:22.01-tf2-py3"
           imagePullPolicy: {{ .Values.baseImage.pullPolicy }}
           ports:
             - name: tensorboard
@@ -144,6 +145,9 @@ spec:
               protocol: TCP
           command: ["/bin/bash"]
           args: ["-c", "pip install -U tensorboard-plugin-profile && mkdir -p /workspace/tensorboard/{{ .Values.appPrefix }} && tensorboard --logdir=/workspace/tensorboard/{{ .Values.appPrefix }} --bind_all"]
+          env:
+            - name: CUDA_VISIBLE_DEVICES
+              value: "-1"
           volumeMounts:
             - name: {{ .Values.appPrefix }}-storage
               mountPath: /workspace
