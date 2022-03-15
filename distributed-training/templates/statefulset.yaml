@@ -1,37 +1,34 @@
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: {{ .Values.appPrefix }}-workers
+  name: {{ .Values.appPrefix }}
   labels:
     app: {{ .Values.appPrefix }}
-    run: {{ .Values.appPrefix }}-workers
 spec:
+  serviceName: "{{ .Values.appPrefix }}"
+  replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
       app: {{ .Values.appPrefix }}
-  serviceName: {{ .Values.appPrefix }}-workers
-  replicas: {{ .Values.replicaCount }}
   template:
     metadata:
       labels: 
         app: {{ .Values.appPrefix }}
-        run: {{ .Values.appPrefix }}-workers
     spec:
       affinity: {{- toYaml .Values.nodeAffinity | nindent 12 }}
       imagePullSecrets:
         - name: ngc-secret
-      subdomain: {{ .Values.appPrefix }}-subdomain
       containers:
-        - name: {{ .Values.appPrefix }}-workers
+        - name: {{ .Values.appPrefix }}
           image: "{{ .Values.baseImage.repository }}:{{ .Values.baseImage.tag }}"
           imagePullPolicy: {{ .Values.baseImage.pullPolicy }}
           ports:
-            - name: gcrp
+            - name: workers
               containerPort: 5005
-              protocol: TCP
             - name: profiler-port
               containerPort: 2223
-              protocol: TCP
+            - name: web
+              containerPort: 80
           command: [ "sh", "-c"]
           args:
           - while true; do
@@ -78,22 +75,22 @@ spec:
             - name: MY_CPU_REQUEST
               valueFrom:
                 resourceFieldRef:
-                  containerName: {{ .Values.appPrefix }}-workers
+                  containerName: {{ .Values.appPrefix }}
                   resource: requests.cpu
             - name: MY_CPU_LIMIT
               valueFrom:
                 resourceFieldRef:
-                  containerName: {{ .Values.appPrefix }}-workers
+                  containerName: {{ .Values.appPrefix }}
                   resource: limits.cpu
             - name: MY_MEM_REQUEST
               valueFrom:
                 resourceFieldRef:
-                  containerName: {{ .Values.appPrefix }}-workers
+                  containerName: {{ .Values.appPrefix }}
                   resource: requests.memory
             - name: MY_MEM_LIMIT
               valueFrom:
                 resourceFieldRef:
-                  containerName: {{ .Values.appPrefix }}-workers
+                  containerName: {{ .Values.appPrefix }}
                   resource: limits.memory
             - name: APP_NAME
               value: {{ .Values.appPrefix }}
@@ -117,24 +114,20 @@ metadata:
   name: {{ .Values.appPrefix }}-tensorboard
   labels:
     app: {{ .Values.appPrefix }}
-    run: {{ .Values.appPrefix }}-tensorboard
 spec:
   selector:
     matchLabels:
       app: {{ .Values.appPrefix }}
-      run: {{ .Values.appPrefix }}-tensorboard
   serviceName: {{ .Values.appPrefix }}-tensorboard
   replicas: 1
   template:
     metadata:
       labels: 
         app: {{ .Values.appPrefix }}
-        run: {{ .Values.appPrefix }}-tensorboard
     spec:
       nodeName: {{ .Values.tensorboardNode }}
       imagePullSecrets:
         - name: ngc-secret
-      subdomain: {{ .Values.appPrefix }}
       containers:
         - name: {{ .Values.appPrefix }}-tensorboard
           image: "nvcr.io/nvidia/tensorflow:22.01-tf2-py3"

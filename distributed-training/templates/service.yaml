@@ -13,24 +13,22 @@ spec:
       protocol: TCP
       targetPort: 6006
   selector:
-    app: {{ .Values.appPrefix }}
+    app: {{ .Values.appPrefix }}-tensorboard
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ .Values.appPrefix }}-subdomain
+  name: {{ .Values.appPrefix }}
   labels:
     app: {{ .Values.appPrefix }}
 spec:
-  clusterIP: None
   ports:
     - name: workers
       port: 5005
-      protocol: TCP
-      targetPort: 5005
     - name: profiler-port
       port: 2223
-      protocol: TCP
-      targetPort: 2223
+    - name: web
+      port: 80
+  clusterIP: None
   selector:
-    name: {{ .Values.appPrefix }}-workers
+    app: {{ .Values.appPrefix }}
