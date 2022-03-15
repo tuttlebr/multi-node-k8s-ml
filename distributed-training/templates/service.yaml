@@ -3,11 +3,11 @@ kind: Service
 metadata:
   name: {{ .Values.appPrefix }}-tensorboard
   labels:
-    app: {{ .Values.appPrefix }}
+    app: {{ .Values.appPrefix }}-tensorboard
 spec:
   type: NodePort
   ports:
-    - name: tensorboard
+    - name: {{ .Values.appPrefix }}-tensorboard
       nodePort: {{ .Values.service.nodePort }}
       port: 6006
       protocol: TCP
@@ -27,8 +27,6 @@ spec:
       port: 5005
     - name: profiler-port
       port: 2223
-    - name: web
-      port: 80
   clusterIP: None
   selector:
     app: {{ .Values.appPrefix }}
