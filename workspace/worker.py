@@ -115,78 +115,81 @@ def load_dataset():
 
     return (x_train, y_train), (x_test, y_test)
 
+def main():
+    (x, y), (x_test, y_test) = load_dataset()
 
-(x, y), (x_test, y_test) = load_dataset()
+    train_dataset = tf.data.Dataset.from_tensor_slices((x, y))
+    test_dataset = tf.data.Dataset.from_tensor_slices((x_test, y_test))
 
-train_dataset = tf.data.Dataset.from_tensor_slices((x, y))
-test_dataset = tf.data.Dataset.from_tensor_slices((x_test, y_test))
-
-tf.random.set_seed(22)
-train_dataset = (
-    train_dataset.map(
-        augmentation,
-        num_parallel_calls=tf.data.AUTOTUNE,
-        name="image_augmentation",
+    tf.random.set_seed(22)
+    train_dataset = (
+        train_dataset.map(
+            augmentation,
+            num_parallel_calls=tf.data.AUTOTUNE,
+            name="image_augmentation",
+        )
+        .cache(name="dataset_cache")
+        .map(
+            normalize,
+            num_parallel_calls=tf.data.AUTOTUNE,
+            name="image_normalization",
+        )
+        .shuffle(NUM_TRAIN_SAMPLES, name="dataset_shuffle")
+        .prefetch(tf.data.AUTOTUNE, name="dataset_prefetch")
+        .batch(
+            BS_PER_GPU * NUM_GPUS,
+            num_parallel_calls=tf.data.AUTOTUNE,
+            drop_remainder=True,
+            name="image_batching",
+        )
     )
-    .cache(name="dataset_cache")
-    .map(
-        normalize,
-        num_parallel_calls=tf.data.AUTOTUNE,
-        name="image_normalization",
-    )
-    .shuffle(NUM_TRAIN_SAMPLES, name="dataset_shuffle")
-    .prefetch(tf.data.AUTOTUNE, name="dataset_prefetch")
-    .batch(
-        BS_PER_GPU * NUM_GPUS,
-        num_parallel_calls=tf.data.AUTOTUNE,
-        drop_remainder=True,
-        name="image_batching",
-    )
-)
-test_dataset = test_dataset.map(normalize).batch(
-    BS_PER_GPU * NUM_GPUS, drop_remainder=True
-)
-
-
-input_shape = (HEIGHT, WIDTH, NUM_CHANNELS)
-img_input = tf.keras.layers.Input(shape=input_shape)
-opt = keras.optimizers.SGD(learning_rate=0.1, momentum=0.9)
-
-APP_NAME = os.getenv("APP_NAME")
-TIMESTAMP = datetime.datetime.now().strftime("%Y%m%d-%H%M")
-app_dir = os.path.join("/workspace/tensorboard", APP_NAME)
-log_dir = os.path.join(app_dir, TIMESTAMP, WORKER_ID)
-save_dir = os.path.join(app_dir, TIMESTAMP)
-
-file_writer = tf.summary.create_file_writer(log_dir)
-with file_writer.as_default():
-    images = x[0:25]
-    tf.summary.image(
-        "25 training data examples", images, max_outputs=25, step=0
+    test_dataset = test_dataset.map(normalize).batch(
+        BS_PER_GPU * NUM_GPUS, drop_remainder=True
     )
 
-tensorboard_callback = tf.keras.callbacks.TensorBoard(
-    log_dir=log_dir, histogram_freq=1, update_freq=1, profile_batch="10, 20"
-)
-checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
-    save_dir,
-    monitor="val_loss",
-    save_best_only=True
-)
 
+    input_shape = (HEIGHT, WIDTH, NUM_CHANNELS)
+    img_input = tf.keras.layers.Input(shape=input_shape)
+    opt = keras.optimizers.SGD(learning_rate=0.1, momentum=0.9)
 
-tf.profiler.experimental.server.start(6006)
-with strategy.scope():
-    model = resnet.resnet56(img_input=img_input, classes=NUM_CLASSES)
-    model.compile(
-        optimizer=opt,
-        loss="sparse_categorical_crossentropy",
-        metrics=["sparse_categorical_accuracy"],
+    APP_NAME = os.getenv("APP_NAME")
+    TIMESTAMP = datetime.datetime.now().strftime("%Y%m%d-%H%M")
+    app_dir = os.path.join("/workspace/tensorboard", APP_NAME)
+    log_dir = os.path.join(app_dir, TIMESTAMP, WORKER_ID)
+    save_dir = os.path.join(app_dir, TIMESTAMP)
+
+    file_writer = tf.summary.create_file_writer(log_dir)
+    with file_writer.as_default():
+        images = x[0:25]
+        tf.summary.image(
+            "25 training data examples", images, max_outputs=25, step=0
+        )
+
+    tensorboard_callback = tf.keras.callbacks.TensorBoard(
+        log_dir=log_dir, histogram_freq=1, update_freq=1, profile_batch="10, 20"
     )
-model.fit(
-    train_dataset,
-    validation_data=test_dataset,
-    epochs=NUM_EPOCHS,
-    callbacks=[tensorboard_callback, checkpoint_callback],
-)
-model.save(save_dir)
+    checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
+        save_dir,
+        monitor="val_loss",
+        save_best_only=True
+    )
+
+
+    tf.profiler.experimental.server.start(6006)
+    with strategy.scope():
+        model = resnet.resnet56(img_input=img_input, classes=NUM_CLASSES)
+        model.compile(
+            optimizer=opt,
+            loss="sparse_categorical_crossentropy",
+            metrics=["sparse_categorical_accuracy"],
+        )
+    model.fit(
+        train_dataset,
+        validation_data=test_dataset,
+        epochs=NUM_EPOCHS,
+        callbacks=[tensorboard_callback, checkpoint_callback],
+    )
+    model.save(save_dir)
+
+if __name__=="__main__":
+    main()
