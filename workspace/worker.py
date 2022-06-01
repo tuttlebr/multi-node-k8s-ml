@@ -20,8 +20,6 @@ from tensorflow.keras import mixed_precision
 
 import resnet as resnet
 
-mixed_precision.set_global_policy("mixed_float16")
-
 """
 Remember to set the TF_CONFIG envrionment variable.
 
@@ -29,6 +27,7 @@ For example:
 
 export TF_CONFIG='{"cluster": {"worker": ["10.1.10.58:12345", "10.1.10.250:12345"]}, "task": {"index": 0, "type": "worker"}}'
 """
+# mixed_precision.set_global_policy("mixed_float16")
 
 communication_options = tf.distribute.experimental.CommunicationOptions(
     implementation=tf.distribute.experimental.CommunicationImplementation.NCCL
@@ -39,7 +38,7 @@ strategy = tf.distribute.MultiWorkerMirroredStrategy(
 ## - or -
 # strategy = tf.distribute.MultiWorkerMirroredStrategy()
 
-NUM_GPUS = int(os.getenv("N_NODE")) * int(os.getenv("N_GPU"))
+NUM_GPUS = int(3)
 BS_PER_GPU = 128
 NUM_EPOCHS = 60
 

@@ -1,13 +1,16 @@
 kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
+  annotations:
+    volume.beta.kubernetes.io/storage-provisioner: cluster.local/nfs-subdir-external-provisioner
+    helm.sh/resource-policy: keep
   name: {{ .Values.appPrefix }}-pvc
   labels:
     app: {{ .Values.appPrefix }}
 spec:
-  storageClassName: {{ .Values.appPrefix }}-sc
   accessModes:
       - ReadWriteMany
   resources:
     requests:
       storage: {{ .Values.persistentVolume.storage }}
+  storageClassName: "nfs-client"

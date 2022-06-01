@@ -1,32 +1,13 @@
 #/bin/bash
+NGC_EMAIL=btuttle@nvidia.com
+NGC_API_KEY=MmFiMWplNnNqbzZscWZxOWFnczY5M3ZocmE6YjY1MzkyMjUtMzZmMC00NzUwLWI2ZTItODhlOTAyMGFjNjQ3
+WEATHER_STACK_API_KEY=77ff5f0502b4290d086dfbb2eacf6226
 
-# TF Example:
-## Node 1
-# TF_CONIG='{"cluster": {"worker": ["10.233.68.1:5005", "10.233.66.110:5005"]}, "task": {"index": 0, "type": "worker"}}' python worker.py
-## Node 2
-# TF_CONIG='{"cluster": {"worker": ["10.233.68.1:5005", "10.233.66.110:5005"]}, "task": {"index": 1, "type": "worker"}}' python worker.py
-clear
-export APP_NAME=tensorflow-distributed
-export WORKER_IPS=$(kubectl get pods -l run=$APP_NAME-workers -o jsonpath='{range .items[*]}{.status.podIP}{":5005 "}{end}' | xargs)
-export PORT=5005
-export INDEX=0
-
-GRPC_ARRAY=()
-for IP in $WORKER_IPS;
-    do
-        GRPC_ARRAY+="$IP,"
-    done
-
-export GRPC_ARRAY=$(sed 's/,*$//g' <<< $GRPC_ARRAY)
-
-for i in $WORKER_IPS;
-do
-    TF_CONFIG=$( jq -c -n \
-                    --arg workers "$GRPC_ARRAY" \
-                    --arg index "$INDEX" \
-                    '{cluster: {worker: $workers|split(",")}, task: {index: $index, type: "worker"}}'
-                    )
-    echo "TF_CONFIG='$TF_CONFIG' python3 worker.py"
-
-    INDEX=$(($INDEX+1));
-done
+helm delete distributed-training --wait
+sudo rm -rf /export/deepops_nfs/default-tensorflow-distributed-pvc-pvc-2ae5abce-ed25-454e-a295-c4bd3ecf311c/tensorboard
+echo 
+ls -l /export/deepops_nfs/default-tensorflow-distributed-pvc-pvc-2ae5abce-ed25-454e-a295-c4bd3ecf311c/
+echo 
+helm install distributed-training distributed-training \
+    --set imageCredentials.password=$NGC_API_KEY \
+    --set imageCredentials.email=$NGC_EMAIL

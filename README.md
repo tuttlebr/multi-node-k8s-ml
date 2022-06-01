@@ -7,27 +7,14 @@ This helm chart will deploy a StatefulSet of N replicas as defined in the chart'
 
 ## Prerequisite
 1. Kubernetes Cluster (Tested on >= v1.20)
-2. Two or more nodes with at least one NVIDIA GPU (Tested on Amphere architecture)
-3. NFS Access for shared storage
-4. [NVIDIA NGC Account](https://catalog.ngc.nvidia.com/)
+2. Two or more nodes with at least one NVIDIA GPU per node (Tested on Amphere architecture)
+3. [NVIDIA NGC Account](https://catalog.ngc.nvidia.com/)
 
 
 ## Install
-
+Using the `distributed-training/values.yaml` file, set the parameters as needed for your cluster. The most notable options will be the node affinity and resources. Node affinity will allocate all pods to nodes of your defined affinity. Resources will allocate all resources per pod as your defined resources.
 ```bash
 helm install tensorflow distributed-training \
     --set imageCredentials.password=<NGC_API_KEY> \
-    --set imageCredentials.email=<NGC_USER_EMAIL> \
-    --set replicaCount=<N_NODES> \
-    --set resources.limits.nvidia.com/gpu=<GPUS_PER_NODE> \
-    --set tensorboardNode=<SINGE_NODE_HOSTNAME> \
-    --set nfs.path=<NFS_PATH_WITH_YOUR_DATA> \
-    --set nfs.server=<NFS_SERVER_IP_WITH_YOUR_DATA>
-```
-
-Tensorflow Config
-Set environment variable `TF_CONFIG` on each node and begin training.
-Helper function is included and may be modified. Other modifications may be needed for packages other than TensorFlow.
-```bash
-./run.sh
+    --set imageCredentials.email=<NGC_USER_EMAIL>
 ```

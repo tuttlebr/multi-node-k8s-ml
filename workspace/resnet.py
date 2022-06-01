@@ -27,7 +27,7 @@ import tensorflow as tf
 from tensorflow.python.keras import backend, layers
 from tensorflow.keras import mixed_precision
 
-mixed_precision.set_global_policy("mixed_float16")
+# mixed_precision.set_global_policy("mixed_float16")
 
 BATCH_NORM_DECAY = 0.997
 BATCH_NORM_EPSILON = 1e-5

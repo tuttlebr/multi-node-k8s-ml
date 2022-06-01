@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ .Values.appPrefix }}-tensorboard
+  labels:
+    app: {{ .Values.appPrefix }}-tensorboard
+spec:
+  selector:
+    matchLabels:
+      app: {{ .Values.appPrefix }}-tensorboard
+  serviceName: {{ .Values.appPrefix }}-tensorboard
+  replicas: 1
+  template:
+    metadata:
+      labels: 
+        app: {{ .Values.appPrefix }}-tensorboard
+    spec:
+      nodeName: {{ .Values.tensorboardNode }}
+      imagePullSecrets:
+        - name: ngc-secret
+      containers:
+        - name: {{ .Values.appPrefix }}-tensorboard
+          image: "nvcr.io/nvidia/tensorflow:22.01-tf2-py3"
+          imagePullPolicy: {{ .Values.baseImage.pullPolicy }}
+          ports:
+            - name: tensorboard
+              containerPort: 6006
+              protocol: TCP
+          command: ["/bin/bash"]
+          args: ["-c", "mkdir -p /workspace/tensorboard/{{ .Values.appPrefix }} && tensorboard --logdir=/workspace/tensorboard/{{ .Values.appPrefix }} --bind_all"]
+          env:
+            - name: CUDA_VISIBLE_DEVICES
+              value: "-1"
+          volumeMounts:
+            - name: {{ .Values.appPrefix }}-storage
+              mountPath: /workspace
+      volumes:
+        - name: {{ .Values.appPrefix }}-storage
+          persistentVolumeClaim:
+            claimName: {{ .Values.appPrefix }}-pvc

@@ -1,0 +1,86 @@
+{{- $image_version := "" }}
+{{- $namespace := "" }}
+{{- $appPrefix := "" }}
+{{- $i := "" }}
+{{- $current := "" }}
+{{- $affinity := "" }}
+{{- $resources := "" }}
+{{- $myList := list }}
+{{- $start := 1 }}
+{{- $chief := "" }}
+
+{{- $image_version = printf "%s:%s" .Values.baseImage.repository .Values.baseImage.tag }}
+{{- $namespace = .Release.Namespace | toString }}
+
+{{- $appPrefix = .Values.appPrefix | toString }}
+{{- $stop := .Values.MultiWorkerMirroredStrategy.replicas | int }}
+{{- $chief = print $appPrefix "-chief-0-0" "." $appPrefix "." $namespace ".svc.cluster.local:5005" | quote}}
+{{- $myList = append $myList $chief }}
+
+{{- with .Values.MultiWorkerMirroredStrategy.affinity }}
+    {{- $affinity = toYaml . | nindent 12 }}
+{{- end }}
+
+{{- with .Values.MultiWorkerMirroredStrategy.resources }}
+    {{- $resources = toYaml . | nindent 12 }}
+{{- end }}
+
+{{- range untilStep $start $stop 1 }}
+  {{- $i = . | toString }}
+  {{- $current = print $appPrefix "-worker-" $i "-0." $appPrefix "." $namespace ".svc.cluster.local:5005" | quote }}
+  {{- $myList = append $myList $current }}
+{{- end }}
+
+{{- range untilStep $start $stop 1 }}
+{{- $i = . | toString }}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: "{{ $appPrefix }}-worker-{{ . }}"
+  labels:
+    app: {{ $appPrefix }}
+spec:
+  serviceName: {{ $appPrefix }}
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ $appPrefix }}
+  template:
+    metadata:
+      labels: 
+        app: {{ $appPrefix }}
+    spec:
+      affinity: 
+    {{ $affinity }}
+      imagePullSecrets:
+        - name: ngc-secret
+      containers:
+        - name: "{{ $appPrefix }}-worker-{{ . }}"
+          image: "{{ $image_version }}"
+          resources:
+        {{- $resources }}
+          ports:
+            - name: workers
+              containerPort: 5005 
+          command: [ "sh", "-c"]
+          args:
+          - python3 worker.py
+          env:
+            - name: TF_CONFIG
+              value: '{"cluster": {"worker": [{{ join "," $myList }}]}, "task": {"index": {{ $i }}, "type": "worker"}}'
+            - name: APP_NAME
+              value: "{{ $appPrefix }}"
+          volumeMounts:
+            - name: dshm
+              mountPath: /dev/shm
+            - name: {{ $appPrefix }}-storage
+              mountPath: /workspace
+      volumes:
+        - name: dshm
+          emptyDir:
+            medium: Memory
+        - name: {{ $appPrefix }}-storage
+          persistentVolumeClaim:
+            claimName: {{ $appPrefix }}-pvc
+{{- end }}
