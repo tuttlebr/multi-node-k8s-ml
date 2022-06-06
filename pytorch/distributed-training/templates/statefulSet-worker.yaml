@@ -1,0 +1,133 @@
+{{- $image_version := "" }}
+{{- $namespace := "" }}
+{{- $appPrefix := "" }}
+{{- $i := "" }}
+{{- $is_worker := false }}
+{{- $affinity := "" }}
+{{- $resources := "" }}
+{{- $start := 0 }}
+{{- $node := "" }}
+{{- $nproc_per_node := 1 }}
+{{- $worldSize := 0 }}
+
+{{- $image_version = printf "%s:%s" .Values.baseImage.repository .Values.baseImage.tag }}
+{{- $namespace = .Release.Namespace | toString }}
+{{- $appPrefix = .Values.appPrefix | toString }}
+{{- $stop := .Values.MultiprocessingDistributed.replicas | int }}
+{{- $node = print $appPrefix "-node-0-0" "." $appPrefix "-0." $namespace ".svc.cluster.local" }}
+{{- $nproc_per_node := .Values.MultiprocessingDistributed.nproc_per_node | int  }}
+
+{{- with .Values.MultiprocessingDistributed.affinity }}
+    {{- $affinity = toYaml . | nindent 12 }}
+{{- end }}
+
+{{- with .Values.MultiprocessingDistributed.resources }}
+    {{- $resources = toYaml . | nindent 12 }}
+{{- end }}
+
+{{- range untilStep $start $stop 1 }}
+{{- $i = . | toString }}
+{{- $is_worker := gt . 0}}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: "{{ $appPrefix }}-{{ $i }}"
+  namespace: {{ $namespace }}
+  labels:
+    app: {{ $appPrefix }}
+    replica: "{{ $appPrefix }}-{{ $i }}"
+spec:
+  ports:
+    - name: workers
+      port: 29500
+  clusterIP: None
+  selector:
+    replica: "{{ $appPrefix }}-{{ $i }}"
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: "{{ $appPrefix }}-node-{{ $i }}"
+  namespace: {{ $namespace }}
+  labels:
+    app: {{ $appPrefix }}
+    replica: "{{ $appPrefix }}-{{ $i }}"
+spec:
+  serviceName: "{{ $appPrefix }}-{{ $i }}"
+  replicas: 1
+  selector:
+    matchLabels:
+      replica: "{{ $appPrefix }}-{{ $i }}"
+  template:
+    metadata:
+      labels: 
+        app: {{ $appPrefix }}
+        replica: "{{ $appPrefix }}-{{ $i }}"
+    spec:
+      affinity: 
+    {{ $affinity }}
+      imagePullSecrets:
+        - name: ngc-secret
+    {{- if $is_worker }}
+      initContainers:
+        - name: "init-{{ $appPrefix }}-worker-{{ $i }}"
+          image: busybox:1.28
+          command: ['sh', '-c', 'until nslookup {{ $node }}; do echo waiting for {{ $node }}; sleep 5; done']
+    {{- end }}
+      containers:
+        - name: "{{ $appPrefix }}-worker-{{ $i }}"
+          image: "{{ $image_version }}"
+          resources:
+        {{- $resources }}
+          ports:
+            - name: workers
+              containerPort: 29500
+              protocol: TCP
+          args:
+            - python
+            - ./multiproc.py
+            - --nnodes={{ $stop }}
+            - --node_rank={{ $i }}
+            - --nproc_per_node={{ $nproc_per_node }}
+            - --master_addr={{ $node }}
+            - --master_port=29500
+            - ./main.py
+            - /imagenet
+            - --training-only
+            - -p=1
+            - --data-backend=syntetic
+            - --raport-file=raport.json
+            - -p=1
+            - --lr=2.048
+            - --optimizer-batch-size={{ mul 8 128 $stop}}
+            - --warmup=8
+            - --arch=resnet50 
+            - --label-smoothing=0.1
+            - --lr-schedule=cosine
+            - --mom=0.875
+            - --wd=3.0517578125e-05
+            - --workspace=/workspace/rn50
+            - -b=128
+            - --prof=100
+            - --amp
+            - --static-loss-scale=128
+          env:
+            - name: WORLD_SIZE
+              value: "{{ $stop }}"
+            - name: LOCAL_RANK
+              value: "{{ $i }}"
+            - name: TORCH_DISTRIBUTED_DEBUG
+              value: 'DETAIL'
+            - name: IS_WORKER
+              value: "{{ $is_worker }}"
+
+
+          volumeMounts:
+            - name: dshm
+              mountPath: /dev/shm
+      volumes:
+        - name: dshm
+          emptyDir:
+            medium: Memory
+{{- end }}

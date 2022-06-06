@@ -1,0 +1,12 @@
+services:
+  pytorch:
+    build:
+      context: submodules/PyTorch/Classification/ConvNets
+      dockerfile: Dockerfile
+    image: registry.local:31500/distributed/pytorch:v0.1.0
+    
+  tensorflow:
+    build:
+      context: submodules/TensorFlow2/Classification/ConvNets
+      dockerfile: Dockerfile
+    image: registry.local:31500/distributed/tensorflow:v0.1.0

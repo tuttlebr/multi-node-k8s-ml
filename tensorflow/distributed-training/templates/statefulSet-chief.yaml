@@ -8,13 +8,15 @@
 {{- $myList := list }}
 {{- $start := 1 }}
 {{- $chief := "" }}
+{{- $nproc_per_node := 1 }}
 
+{{- $nproc_per_node := .Values.MultiWorkerMirroredStrategy.nproc_per_node | int  }}
 {{- $image_version = printf "%s:%s" .Values.baseImage.repository .Values.baseImage.tag }}
 {{- $namespace = .Release.Namespace | toString }}
 
 {{- $appPrefix = .Values.appPrefix | toString }}
 {{- $stop := .Values.MultiWorkerMirroredStrategy.replicas | int }}
-{{- $chief = print $appPrefix "-chief-0-0" "." $appPrefix "." $namespace ".svc.cluster.local:5005" | quote}}
+{{- $chief = print $appPrefix "-chief-0-0" "." $appPrefix "-chief-0." $namespace ".svc.cluster.local:5005" | quote}}
 {{- $myList = append $myList $chief }}
 
 {{- with .Values.MultiWorkerMirroredStrategy.affinity }}
@@ -27,10 +29,24 @@
 
 {{- range untilStep $start $stop 1 }}
   {{- $i = . | toString }}
-  {{- $current = print $appPrefix "-worker-" $i "-0." $appPrefix "." $namespace ".svc.cluster.local:5005" | quote }}
+  {{- $current = print $appPrefix "-worker-" $i "-0." $appPrefix "-worker-" $i "." $namespace ".svc.cluster.local:5005" | quote }}
   {{- $myList = append $myList $current }}
 {{- end }}
-
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: "{{ .Values.appPrefix }}-chief-0"
+  labels:
+    app: {{ $appPrefix }}
+    worker: "{{ .Values.appPrefix }}-chief-0"
+spec:
+  ports:
+    - name: workers
+      port: 5005
+  selector:
+    worker: "{{ .Values.appPrefix }}-chief-0"
+---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -38,15 +54,16 @@ metadata:
   labels:
     app: {{ .Values.appPrefix }}
 spec:
-  serviceName: {{ .Values.appPrefix }}
+  serviceName: "{{ .Values.appPrefix }}-chief-0"
   replicas: 1
   selector:
     matchLabels:
-      app: {{ .Values.appPrefix }}
+      worker: "{{ .Values.appPrefix }}-chief-0"
   template:
     metadata:
       labels: 
         app: {{ .Values.appPrefix }}
+        worker: "{{ .Values.appPrefix }}-chief-0"
     spec:
     {{- with .Values.MultiWorkerMirroredStrategy.affinity }}
       affinity: 
@@ -65,27 +82,20 @@ spec:
           ports:
             - name: workers
               containerPort: 5005 
-          command: [ "sh", "-c"]
           args:
-          - python3 worker.py
+          - sleep
+          - infinity
           env:
             - name: TF_CONFIG
               value: '{"cluster": {"worker": [{{ join "," $myList }}]}, "task": {"index": 0, "type": "worker"}}'
             - name: APP_NAME
               value: "{{ .Values.appPrefix }}"
+            - name: NUM_GPUS
+              value: "{{ $nproc_per_node }}"
           volumeMounts:
             - name: dshm
               mountPath: /dev/shm
-            - name: {{ .Values.appPrefix }}-storage
-              mountPath: /workspace
-      initContainers:
-        - name: {{ .Values.appPrefix }}-init
-          image: busybox:1.28
-          command: ['sh', '-c', 'until nslookup {{ .Values.appPrefix }}-worker-{{ sub .Values.MultiWorkerMirroredStrategy.replicas 1 }}-0.{{ .Values.appPrefix }}.$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace).svc.cluster.local; do echo waiting for all workers server instance.; sleep 5; done']
       volumes:
         - name: dshm
           emptyDir:
             medium: Memory
-        - name: {{ .Values.appPrefix }}-storage
-          persistentVolumeClaim:
-            claimName: {{ .Values.appPrefix }}-pvc

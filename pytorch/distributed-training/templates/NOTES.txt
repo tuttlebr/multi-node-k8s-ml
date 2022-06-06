@@ -1,8 +1,8 @@
 --------------------------------------------------------------------------------
 Installation Complete!
     App:            {{ .Values.appPrefix }} 
-    baseImage:      {{ .Values.baseImage.repository }} 
-    MultiWorkerMirroredStrategy:      {{- toYaml .Values.MultiWorkerMirroredStrategy | nindent 12 }}
+    baseImage:      {{ .Values.baseImage.repository }}:{{ .Values.baseImage.tag }}
+    MultiprocessingDistributed:      {{- toYaml .Values.MultiprocessingDistributed | nindent 12 }}
 
 
 You can monitor the application by running the following kubelet command:

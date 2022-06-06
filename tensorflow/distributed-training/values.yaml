@@ -2,6 +2,7 @@ appPrefix: tensorflow-distributed
 
 MultiWorkerMirroredStrategy:
   replicas: 3
+  nproc_per_node: 1
   resources:
     requests:
       nvidia.com/gpu: 1
@@ -19,10 +20,8 @@ MultiWorkerMirroredStrategy:
                   - "2"
                   - "4"
                   - "8"
-
-service:
-  nodePort: 30600
-
+                  - "16"
+                  
 imageCredentials:
   registry: nvcr.io
   username: $oauthtoken
@@ -30,11 +29,8 @@ imageCredentials:
   email: "user@nvidia.com"
 
 baseImage:
-  repository: nvcr.io/nvidia/tensorflow
-  pullPolicy: IfNotPresent
-  tag: "22.01-tf2-py3"
+  repository: registry.local:31500/distributed/tensorflow
+  pullPolicy: Always
+  tag: "v0.1.0"
   imagePullSecrets:
     - ngc-secret
- 
-persistentVolume:
-  storage: 64Gi

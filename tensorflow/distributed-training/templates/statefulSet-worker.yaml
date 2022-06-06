@@ -8,13 +8,14 @@
 {{- $myList := list }}
 {{- $start := 1 }}
 {{- $chief := "" }}
+{{- $nproc_per_node := 1 }}
 
+{{- $nproc_per_node := .Values.MultiWorkerMirroredStrategy.nproc_per_node | int  }}
 {{- $image_version = printf "%s:%s" .Values.baseImage.repository .Values.baseImage.tag }}
 {{- $namespace = .Release.Namespace | toString }}
-
 {{- $appPrefix = .Values.appPrefix | toString }}
 {{- $stop := .Values.MultiWorkerMirroredStrategy.replicas | int }}
-{{- $chief = print $appPrefix "-chief-0-0" "." $appPrefix "." $namespace ".svc.cluster.local:5005" | quote}}
+{{- $chief = print $appPrefix "-chief-0-0" "." $appPrefix "-chief-0." $namespace ".svc.cluster.local:5005" | quote}}
 {{- $myList = append $myList $chief }}
 
 {{- with .Values.MultiWorkerMirroredStrategy.affinity }}
@@ -27,12 +28,25 @@
 
 {{- range untilStep $start $stop 1 }}
   {{- $i = . | toString }}
-  {{- $current = print $appPrefix "-worker-" $i "-0." $appPrefix "." $namespace ".svc.cluster.local:5005" | quote }}
+  {{- $current = print $appPrefix "-worker-" $i "-0." $appPrefix "-worker-" $i "." $namespace ".svc.cluster.local:5005" | quote }}
   {{- $myList = append $myList $current }}
 {{- end }}
 
 {{- range untilStep $start $stop 1 }}
 {{- $i = . | toString }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $appPrefix }}-worker-{{ . }}
+  labels:
+    app: {{ $appPrefix }}
+spec:
+  ports:
+    - name: workers
+      port: 5005
+  selector:
+    worker: "{{ $appPrefix }}-worker-{{ . }}"
 ---
 apiVersion: apps/v1
 kind: StatefulSet
@@ -40,21 +54,29 @@ metadata:
   name: "{{ $appPrefix }}-worker-{{ . }}"
   labels:
     app: {{ $appPrefix }}
+    worker: "{{ $appPrefix }}-worker-{{ . }}"
 spec:
-  serviceName: {{ $appPrefix }}
+  serviceName: {{ $appPrefix }}-worker-{{ . }}
   replicas: 1
   selector:
     matchLabels:
-      app: {{ $appPrefix }}
+      worker: "{{ $appPrefix }}-worker-{{ . }}"
   template:
     metadata:
       labels: 
+        worker: "{{ $appPrefix }}-worker-{{ . }}"
         app: {{ $appPrefix }}
     spec:
       affinity: 
     {{ $affinity }}
       imagePullSecrets:
         - name: ngc-secret
+
+      initContainers:
+        - name: "init-{{ $appPrefix }}-worker-{{ . }}"
+          image: busybox:1.28
+          command: ['sh', '-c', 'until nslookup {{ $chief | replace ":5005" ""}}; do echo waiting for {{ $chief }}; sleep 5; done']
+
       containers:
         - name: "{{ $appPrefix }}-worker-{{ . }}"
           image: "{{ $image_version }}"
@@ -63,24 +85,21 @@ spec:
           ports:
             - name: workers
               containerPort: 5005 
-          command: [ "sh", "-c"]
           args:
-          - python3 worker.py
+          - sleep
+          - infinity
           env:
             - name: TF_CONFIG
               value: '{"cluster": {"worker": [{{ join "," $myList }}]}, "task": {"index": {{ $i }}, "type": "worker"}}'
             - name: APP_NAME
               value: "{{ $appPrefix }}"
+            - name: NUM_GPUS
+              value: "{{ $nproc_per_node }}"
           volumeMounts:
             - name: dshm
               mountPath: /dev/shm
-            - name: {{ $appPrefix }}-storage
-              mountPath: /workspace
       volumes:
         - name: dshm
           emptyDir:
             medium: Memory
-        - name: {{ $appPrefix }}-storage
-          persistentVolumeClaim:
-            claimName: {{ $appPrefix }}-pvc
 {{- end }}
