@@ -1,6 +1,0 @@
-[submodule "deeplearningexamples"]
-	path = submodules/DeepLearningExamples
-	url = https://github.com/NVIDIA/DeepLearningExamples.git
-[submodule "benchmarks"]
-	path = submodules/benchmarks
-	url = https://github.com/tensorflow/benchmarks.git
