@@ -1,0 +1,97 @@
+{{- $image_version := "" }}
+{{- $namespace := "" }}
+{{- $appPrefix := "" }}
+{{- $jobName := "" }}
+{{- $i := "" }}
+{{- $current := "" }}
+{{- $affinity := "" }}
+{{- $resources := "" }}
+{{- $args := ""}}
+{{- $start := 0 }}
+{{- $nproc_per_node := 1 }}
+{{- $nnodes := 0 }}
+
+{{- $nproc_per_node := .Values.MultiprocessingDistributed.nproc_per_node | int  }}
+{{- $nnodes := .Values.MultiprocessingDistributed.replicas | int  }}
+{{- $image_version = printf "%s:%s" .Values.baseImage.repository .Values.baseImage.tag }}
+{{- $namespace = .Release.Namespace | toString }}
+{{- $appPrefix = .Values.appPrefix | toString }}
+
+{{- with .Values.MultiprocessingDistributed.affinity }}
+    {{- $affinity = toYaml . | nindent 12 }}
+{{- end }}
+
+{{- with .Values.MultiprocessingDistributed.resources }}
+    {{- $resources = toYaml . | nindent 12 }}
+{{- end }}
+
+{{- with .Values.MultiprocessingDistributed.args }}
+    {{- $args = toYaml . | nindent 12 }}
+{{- end }}
+
+{{- range untilStep $start $nnodes 1 }}
+  {{- $i = . | toString }}
+  {{- $jobName = print $appPrefix "-" $i }}
+  {{- $current = print $jobName "." $appPrefix "." $namespace ".svc.cluster.local:5005" | quote }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $jobName }}
+  namespace: {{ $namespace }}
+  labels:
+    app: {{ $appPrefix }}
+spec:
+  ttlSecondsAfterFinished: 120
+  template:
+    metadata:
+      labels: 
+        app: {{ $appPrefix }}
+    spec:
+      affinity: 
+    {{ $affinity }}
+      imagePullSecrets:
+        - name: ngc-secret
+      subdomain: {{ $appPrefix }}
+      hostname: {{ $jobName }}
+      restartPolicy: Never
+      containers: 
+        - name: {{ $jobName }}
+          image: {{ $image_version }}
+          imagePullPolicy: Always
+          resources:
+        {{- $resources }}
+          ports:
+            - name: workers
+              containerPort: 5005 
+          args:
+        {{ $args }}
+          env:
+            - name: NNODES
+              value: "{{ $nnodes }}"
+            - name: NPROC_PER_NODE
+              value: "{{ $nproc_per_node }}"
+            - name: NODE_RANK
+              value: "{{ $i }}"
+            - name: MASTER_ADDR
+              value: {{ print $appPrefix "-0." $appPrefix "." $namespace ".svc.cluster.local" | quote }}
+            - name: MASTER_PORT
+              value: "5005"
+            - name: TORCH_DISTRIBUTED_DEBUG
+              value: INFO
+            - name: NCCL_DEBUG
+              value: INFO
+            - name: NCCL_DEBUG_SUBSYS
+              value: NET
+            - name: NCCL_IB_DISABLE
+              value: "0"
+            - name: NCCL_NET_GDR_LEVEL
+              value: "2"
+          volumeMounts:
+            - name: dshm
+              mountPath: /dev/shm
+      volumes:
+        - name: dshm
+          emptyDir:
+            medium: Memory
+{{- end }}

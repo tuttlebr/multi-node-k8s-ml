@@ -21,6 +21,25 @@ MultiprocessingDistributed:
                   - "4"
                   - "8"
                   - "16"
+  args:
+    - python
+    - -m
+    - torch.distributed.launch
+    - --use_env
+    - ./main.py
+    - /imagenet
+    - --training-only
+    - --data-backend=syntetic
+    - --epochs=10
+    - --prof=70
+    - --batch-size=256
+    - --learning-rate=0.1
+    - --arch=resnet50
+    - --workspace=/workspace/rn50
+    - --num-classes=10
+    - --image-size=28
+    - --amp
+    - --static-loss-scale=128
 
 imageCredentials:
   registry: nvcr.io

@@ -1,12 +1,16 @@
 services:
   pytorch:
     build:
-      context: submodules/PyTorch/Classification/ConvNets
-      dockerfile: Dockerfile
+      dockerfile: ../Dockerfile
+      context: pytorch
+      args:
+        - BASE_IMAGE=nvcr.io/nvidia/pytorch:22.04-py3
     image: registry.local:31500/distributed/pytorch:v0.1.0
     
   tensorflow:
     build:
-      context: submodules/TensorFlow2/Classification/ConvNets
-      dockerfile: Dockerfile
+      dockerfile: ../Dockerfile
+      context: tensorflow
+      args:
+        - BASE_IMAGE=nvcr.io/nvidia/tensorflow:22.04-tf2-py3
     image: registry.local:31500/distributed/tensorflow:v0.1.0

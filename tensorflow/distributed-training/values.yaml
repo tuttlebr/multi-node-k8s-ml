@@ -21,7 +21,15 @@ MultiWorkerMirroredStrategy:
                   - "4"
                   - "8"
                   - "16"
-                  
+  args:
+    - python3
+    - main.py
+    - --epochs=10
+    - --steps=70
+    - --batch-size=64
+    - --learning-rate=0.1
+    - --collective-communication=auto
+
 imageCredentials:
   registry: nvcr.io
   username: $oauthtoken
