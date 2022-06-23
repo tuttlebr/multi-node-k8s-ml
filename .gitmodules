@@ -1,3 +1,0 @@
-[submodule "submodules/DeepLearningExamples"]
-	path = submodules/DeepLearningExamples
-	url = https://github.com/NVIDIA/DeepLearningExamples.git
