@@ -23,23 +23,21 @@ MultiprocessingDistributed:
                   - "16"
   args:
     - python
-    - -m
-    - torch.distributed.launch
-    - --use_env
-    - ./main.py
-    - /imagenet
-    - --training-only
-    - --data-backend=syntetic
+    - train.py
+    - --model=resnet18
+    - --batch-size=1024
     - --epochs=10
-    - --prof=70
-    - --batch-size=256
-    - --learning-rate=0.1
-    - --arch=resnet50
-    - --workspace=/workspace/rn50
-    - --num-classes=10
-    - --image-size=28
+    - --lr=0.5
+    - --momentum=0.9
+    - --weight-decay=0.00002
+    - --lr-step-size=30
+    - --lr-gamma=0.1
+    - --print-freq=1
+    - --val-resize-size=28 
+    - --val-crop-size=28 
+    - --train-crop-size=28
+    - --output-dir=/workspace/data/resnet18
     - --amp
-    - --static-loss-scale=128
 
 imageCredentials:
   registry: nvcr.io

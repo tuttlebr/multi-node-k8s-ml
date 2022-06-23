@@ -41,8 +41,10 @@ metadata:
   namespace: {{ $namespace }}
   labels:
     app: {{ $appPrefix }}
+  annotations:
+    "helm.sh/hook-delete-policy": hook-succeeded
 spec:
-  ttlSecondsAfterFinished: 120
+  ttlSecondsAfterFinished: 20
   template:
     metadata:
       labels: 
@@ -67,31 +69,38 @@ spec:
           args:
         {{ $args }}
           env:
-            - name: NNODES
-              value: "{{ $nnodes }}"
-            - name: NPROC_PER_NODE
-              value: "{{ $nproc_per_node }}"
-            - name: NODE_RANK
-              value: "{{ $i }}"
-            - name: MASTER_ADDR
-              value: {{ print $appPrefix "-0." $appPrefix "." $namespace ".svc.cluster.local" | quote }}
-            - name: MASTER_PORT
+            - name: HEAD_PORT
               value: "5005"
+            - name: HEAD_ADDR
+              value: {{ print "tcp://" $appPrefix "-0." $appPrefix "." $namespace ".svc.cluster.local" | quote }}
+            - name: WORLD_SIZE
+              value: "{{ $nnodes }}"
+            - name: RANK
+              value: "{{ $i }}"
+            - name: LOCAL_RANK
+              value: "{{ $i }}"
             - name: TORCH_DISTRIBUTED_DEBUG
               value: INFO
             - name: NCCL_DEBUG
               value: INFO
-            - name: NCCL_DEBUG_SUBSYS
-              value: NET
-            - name: NCCL_IB_DISABLE
-              value: "0"
-            - name: NCCL_NET_GDR_LEVEL
-              value: "2"
+            # - name: CUDA_LAUNCH_BLOCKING
+            #   value: "1"
           volumeMounts:
             - name: dshm
               mountPath: /dev/shm
+            - name: data
+              mountPath: /workspace/data
+    {{ if gt . 0 }}
+      initContainers:
+        - name: "init-{{ $jobName }}"
+          image: busybox:1.28
+          command: ['sh', '-c', 'until nslookup {{ print $appPrefix "-0." $appPrefix "." $namespace ".svc.cluster.local" | quote }}; do echo waiting for head node...; sleep 10; done']
+    {{- end }}
       volumes:
         - name: dshm
           emptyDir:
             medium: Memory
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ $appPrefix }}
 {{- end }}

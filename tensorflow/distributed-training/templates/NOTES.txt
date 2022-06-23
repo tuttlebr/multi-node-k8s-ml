@@ -1,9 +1,0 @@
---------------------------------------------------------------------------------
-Installation Complete!
-    App:            {{ .Values.appPrefix }} 
-    baseImage:      {{ .Values.baseImage.repository }}:{{ .Values.baseImage.tag }} 
-    MultiWorkerMirroredStrategy:      {{- toYaml .Values.MultiWorkerMirroredStrategy | nindent 8 }}
-
-
-You can monitor the application by running the following kubelet command:
-    kubectl --namespace {{ .Release.Namespace }} get all -l app="{{ .Values.appPrefix }}" -o wide

@@ -6,6 +6,8 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     app: {{ .Values.appPrefix }}
+  annotations:
+    "helm.sh/hook-delete-policy": hook-succeeded
 spec:
   ports:
     - name: workers
