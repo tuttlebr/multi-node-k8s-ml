@@ -92,7 +92,7 @@ def train_one_epoch(
         writer.add_scalar('acc5/train', acc5, epoch)
         writer.add_scalar('Images Per Second/train', imgps, epoch)
         writer.add_scalar('Loss/train', loss.item(), epoch)
-        writer.add_scalar('Learning Rate/train', loss.item(), epoch)
+        writer.add_scalar('Learning Rate/train', optimizer.param_groups[0]["lr"], epoch)
 
 
 def evaluate(
