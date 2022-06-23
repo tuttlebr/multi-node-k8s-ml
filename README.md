@@ -11,9 +11,6 @@ This helm chart will deploy a StatefulSet of N replicas as defined in the chart'
 1. Kubernetes Cluster (Tested on >= v1.20)
 2. Two or more nodes with at least one NVIDIA GPU per node (Tested on Amphere architecture)
 3. [NVIDIA NGC Account](https://catalog.ngc.nvidia.com/)
-4. [NGC command line tool]
-5. Pytorch Example: `ngc registry resource download-version "nvidia/bert_for_pytorch:20.06.18" --dest pytorch`
-6. Tensorflow Example: `ngc registry resource download-version "nvidia/bert_for_tensorflow:20.06.17" --dest tensorflow`
 
 ## Install
 
