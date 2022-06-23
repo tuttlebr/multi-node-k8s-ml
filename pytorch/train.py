@@ -12,6 +12,7 @@ import utils
 from sampler import RASampler
 from torch import nn
 from torch.utils.data.dataloader import default_collate
+from torch.utils.tensorboard import SummaryWriter
 from torchvision.transforms.functional import InterpolationMode
 
 
@@ -25,13 +26,19 @@ def train_one_epoch(
     args,
     model_ema=None,
     scaler=None,
+    writer=None,
 ):
     model.train()
     metric_logger = utils.MetricLogger(delimiter="  ")
-    metric_logger.add_meter("lr", utils.SmoothedValue(window_size=1, fmt="{value}"))
-    metric_logger.add_meter("img/s", utils.SmoothedValue(window_size=10, fmt="{value}"))
+    metric_logger.add_meter(
+        "lr", utils.SmoothedValue(window_size=1, fmt="{value}")
+    )
+    metric_logger.add_meter(
+        "img/s", utils.SmoothedValue(window_size=10, fmt="{value}")
+    )
 
     header = f"Epoch: [{epoch}]"
+    
     for i, (image, target) in enumerate(
         metric_logger.log_every(data_loader, args.print_freq, header)
     ):
@@ -47,13 +54,17 @@ def train_one_epoch(
             if args.clip_grad_norm is not None:
                 # we should unscale the gradients of optimizer's assigned params if do gradient clipping
                 scaler.unscale_(optimizer)
-                nn.utils.clip_grad_norm_(model.parameters(), args.clip_grad_norm)
+                nn.utils.clip_grad_norm_(
+                    model.parameters(), args.clip_grad_norm
+                )
             scaler.step(optimizer)
             scaler.update()
         else:
             loss.backward()
             if args.clip_grad_norm is not None:
-                nn.utils.clip_grad_norm_(model.parameters(), args.clip_grad_norm)
+                nn.utils.clip_grad_norm_(
+                    model.parameters(), args.clip_grad_norm
+                )
             optimizer.step()
 
         if model_ema and i % args.model_ema_steps == 0:
@@ -64,20 +75,38 @@ def train_one_epoch(
 
         acc1, acc5 = utils.accuracy(output, target, topk=(1, 5))
         batch_size = image.shape[0]
-        metric_logger.update(loss=loss.item(), lr=optimizer.param_groups[0]["lr"])
+        metric_logger.update(
+            loss=loss.item(), lr=optimizer.param_groups[0]["lr"]
+        )
         metric_logger.meters["acc1"].update(acc1.item(), n=batch_size)
         metric_logger.meters["acc5"].update(acc5.item(), n=batch_size)
-        metric_logger.meters["img/s"].update(batch_size / (time.time() - start_time))
+        imgps = batch_size / (time.time() - start_time)
+        metric_logger.meters["img/s"].update(imgps)
+        if writer and epoch==0:
+            writer.add_graph(model, image)
+            grid = torchvision.utils.make_grid(image)
+            writer.add_image('images', grid, 0)
+    if writer:
+
+        writer.add_scalar('acc1/train', acc1, epoch)
+        writer.add_scalar('acc5/train', acc5, epoch)
+        writer.add_scalar('Images Per Second/train', imgps, epoch)
+        writer.add_scalar('Loss/train', loss.item(), epoch)
+        writer.add_scalar('Learning Rate/train', loss.item(), epoch)
 
 
-def evaluate(model, criterion, data_loader, device, print_freq=100, log_suffix=""):
+def evaluate(
+    model, criterion, data_loader, device, print_freq=100, log_suffix=""
+):
     model.eval()
     metric_logger = utils.MetricLogger(delimiter="  ")
     header = f"Test: {log_suffix}"
 
     num_processed_samples = 0
     with torch.inference_mode():
-        for image, target in metric_logger.log_every(data_loader, print_freq, header):
+        for image, target in metric_logger.log_every(
+            data_loader, print_freq, header
+        ):
             image = image.to(device, non_blocking=True)
             target = target.to(device, non_blocking=True)
             output = model(image)
@@ -93,7 +122,9 @@ def evaluate(model, criterion, data_loader, device, print_freq=100, log_suffix="
             num_processed_samples += batch_size
     # gather the stats from all processes
 
-    num_processed_samples = utils.reduce_across_processes(num_processed_samples)
+    num_processed_samples = utils.reduce_across_processes(
+        num_processed_samples
+    )
     if (
         hasattr(data_loader.dataset, "__len__")
         and len(data_loader.dataset) != num_processed_samples
@@ -215,9 +246,13 @@ def load_data(traindir, valdir, args):
     print("Creating data loaders")
     if args.distributed:
         if hasattr(args, "ra_sampler") and args.ra_sampler:
-            train_sampler = RASampler(dataset, shuffle=True, repetitions=args.ra_reps)
+            train_sampler = RASampler(
+                dataset, shuffle=True, repetitions=args.ra_reps
+            )
         else:
-            train_sampler = torch.utils.data.distributed.DistributedSampler(dataset)
+            train_sampler = torch.utils.data.distributed.DistributedSampler(
+                dataset
+            )
         test_sampler = torch.utils.data.distributed.DistributedSampler(
             dataset_test, shuffle=False
         )
@@ -230,6 +265,11 @@ def load_data(traindir, valdir, args):
 
 def main(args):
     if args.output_dir:
+        args.output_dir = os.path.join(
+            args.output_dir,
+            args.model,
+            "bs{}_epochs{}_lr{}".format(args.batch_size, args.epochs, args.lr),
+        )
         utils.mkdir(args.output_dir)
 
     utils.init_distributed_mode(args)
@@ -262,11 +302,15 @@ def main(args):
         )
     if args.cutmix_alpha > 0.0:
         mixup_transforms.append(
-            transforms.RandomCutmix(num_classes, p=1.0, alpha=args.cutmix_alpha)
+            transforms.RandomCutmix(
+                num_classes, p=1.0, alpha=args.cutmix_alpha
+            )
         )
     if mixup_transforms:
         mixupcutmix = torchvision.transforms.RandomChoice(mixup_transforms)
-        collate_fn = lambda batch: mixupcutmix(*default_collate(batch))  # noqa: E731
+        collate_fn = lambda batch: mixupcutmix(
+            *default_collate(batch)
+        )  # noqa: E731
     data_loader = torch.utils.data.DataLoader(
         dataset,
         batch_size=args.batch_size,
@@ -301,7 +345,9 @@ def main(args):
             "position_embedding",
             "relative_position_bias_table",
         ]:
-            custom_keys_weight_decay.append((key, args.transformer_embedding_decay))
+            custom_keys_weight_decay.append(
+                (key, args.transformer_embedding_decay)
+            )
     parameters = utils.set_weight_decay(
         model,
         args.weight_decay,
@@ -402,7 +448,12 @@ def main(args):
         # total_ema_updates = (Dataset_size / n_GPUs) * epochs / (batch_size_per_gpu * EMA_steps)
         # We consider constant = Dataset_size for a given dataset/setup and ommit it. Thus:
         # adjust = 1 / total_ema_updates ~= n_GPUs * batch_size_per_gpu * EMA_steps / epochs
-        adjust = args.world_size * args.batch_size * args.model_ema_steps / args.epochs
+        adjust = (
+            args.world_size
+            * args.batch_size
+            * args.model_ema_steps
+            / args.epochs
+        )
         alpha = 1.0 - args.model_ema_decay
         alpha = min(1.0, alpha * adjust)
         model_ema = utils.ExponentialMovingAverage(
@@ -438,6 +489,7 @@ def main(args):
         return
 
     print("Start training")
+    writer = SummaryWriter(log_dir=args.output_dir)
     start_time = time.time()
     for epoch in range(args.start_epoch, args.epochs):
         if args.distributed:
@@ -452,6 +504,7 @@ def main(args):
             args,
             model_ema,
             scaler,
+            writer=writer
         )
         lr_scheduler.step()
         evaluate(model, criterion, data_loader_test, device=device)
@@ -485,6 +538,7 @@ def main(args):
     total_time = time.time() - start_time
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))
     print(f"Training time {total_time_str}")
+    writer.close()
 
 
 def get_args_parser(add_help=True):
@@ -500,7 +554,9 @@ def get_args_parser(add_help=True):
         type=str,
         help="dataset path or just CIFAR download",
     )
-    parser.add_argument("--model", default="resnet18", type=str, help="model name")
+    parser.add_argument(
+        "--model", default="resnet18", type=str, help="model name"
+    )
     parser.add_argument(
         "--device",
         default="cuda",
@@ -530,7 +586,9 @@ def get_args_parser(add_help=True):
         help="number of data loading workers (default: 16)",
     )
     parser.add_argument("--opt", default="sgd", type=str, help="optimizer")
-    parser.add_argument("--lr", default=0.1, type=float, help="initial learning rate")
+    parser.add_argument(
+        "--lr", default=0.1, type=float, help="initial learning rate"
+    )
     parser.add_argument(
         "--momentum", default=0.9, type=float, metavar="M", help="momentum"
     )
@@ -619,11 +677,15 @@ def get_args_parser(add_help=True):
         type=float,
         help="minimum lr of lr schedule (default: 0.0)",
     )
-    parser.add_argument("--print-freq", default=10, type=int, help="print frequency")
+    parser.add_argument(
+        "--print-freq", default=10, type=int, help="print frequency"
+    )
     parser.add_argument(
         "--output-dir", default=".", type=str, help="path to save outputs"
     )
-    parser.add_argument("--resume", default="", type=str, help="path of checkpoint")
+    parser.add_argument(
+        "--resume", default="", type=str, help="path of checkpoint"
+    )
     parser.add_argument(
         "--start-epoch", default=0, type=int, metavar="N", help="start epoch"
     )
