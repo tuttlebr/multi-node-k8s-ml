@@ -46,8 +46,6 @@ metadata:
   namespace: {{ $namespace }}
   labels:
     app: {{ $appPrefix }}
-  annotations:
-    "helm.sh/hook-delete-policy": hook-succeeded
 spec:
   ttlSecondsAfterFinished: 20
   template:
