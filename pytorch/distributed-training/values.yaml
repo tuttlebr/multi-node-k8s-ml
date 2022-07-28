@@ -1,13 +1,19 @@
+# Trackable name for objects created from this Chart. 
 appPrefix: pytorch-distributed
 
 MultiprocessingDistributed:
-  replicas: 3
+  # N Nodes
+  replicas: 2
+
+  # N GPU per Node
   nproc_per_node: 1
+
+  # Defined this way in the event of MIG labels but should equal nproc_per_node.
   resources:
-    requests:
-      nvidia.com/gpu: 1
     limits:
       nvidia.com/gpu: 1
+
+  # Helpful for heterogenous machine environments.
   affinity:
     nodeAffinity:
       requiredDuringSchedulingIgnoredDuringExecution:
@@ -17,10 +23,9 @@ MultiprocessingDistributed:
                 operator: In
                 values:
                   - "1"
-                  - "2"
-                  - "4"
                   - "8"
-                  - "16"
+
+  # This is what actually runs in the container.
   args:
     - python
     - train.py
@@ -36,15 +41,18 @@ MultiprocessingDistributed:
     - --output-dir=/workspace/data
     - --amp
 
-imageCredentials:
-  registry: nvcr.io
-  username: $oauthtoken
-  password: "api-key"
-  email: "user@nvidia.com"
+# Default image is on Docker hub now but may be pushed/pulled elsewhere.
+createCredentials: false
+imageCredentials: {}
+  # registry: nvcr.io
+  # username: $oauthtoken
+  # password: "api-key"
+  # email: "user@nvidia.com"
 
+# This should be what was defined in the Docker Compose.
+imagePullSecrets: []
+  # - container-secret
 baseImage:
-  repository: registry.local:31500/distributed/pytorch
+  repository: tuttlebr/distributed-pytorch
   pullPolicy: Always
   tag: "v0.1.0"
-  imagePullSecrets:
-    - ngc-secret

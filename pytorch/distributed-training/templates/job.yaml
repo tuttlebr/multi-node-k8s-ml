@@ -5,6 +5,7 @@
 {{- $i := "" }}
 {{- $current := "" }}
 {{- $affinity := "" }}
+{{- $imagepullsecret := "" }}
 {{- $resources := "" }}
 {{- $args := ""}}
 {{- $start := 0 }}
@@ -16,6 +17,10 @@
 {{- $image_version = printf "%s:%s" .Values.baseImage.repository .Values.baseImage.tag }}
 {{- $namespace = .Release.Namespace | toString }}
 {{- $appPrefix = .Values.appPrefix | toString }}
+
+{{- with .Values.imagePullSecrets }}
+    {{- $imagepullsecret = toYaml . | nindent 8 }}
+{{- end }}
 
 {{- with .Values.MultiprocessingDistributed.affinity }}
     {{- $affinity = toYaml . | nindent 12 }}
@@ -53,7 +58,7 @@ spec:
       affinity: 
     {{ $affinity }}
       imagePullSecrets:
-        - name: ngc-secret
+    {{ $imagepullsecret }}
       subdomain: {{ $appPrefix }}
       hostname: {{ $jobName }}
       restartPolicy: Never
@@ -83,8 +88,8 @@ spec:
               value: INFO
             - name: NCCL_DEBUG
               value: INFO
-            # - name: CUDA_LAUNCH_BLOCKING
-            #   value: "1"
+            - name: CUDA_LAUNCH_BLOCKING
+              value: "0"
           volumeMounts:
             - name: dshm
               mountPath: /dev/shm
@@ -92,7 +97,7 @@ spec:
               mountPath: /workspace/data
     {{ if gt . 0 }}
       initContainers:
-        - name: "init-{{ $jobName }}"
+        - name: "init-{{ $jobName }}-connection"
           image: busybox:1.28
           command: ['sh', '-c', 'until nslookup {{ print $appPrefix "-0." $appPrefix "." $namespace ".svc.cluster.local" | quote }}; do echo waiting for head node...; sleep 10; done']
     {{- end }}

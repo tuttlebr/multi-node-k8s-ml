@@ -5,4 +5,4 @@ services:
       context: pytorch
       args:
         - BASE_IMAGE=nvcr.io/nvidia/pytorch:22.04-py3
-    image: registry.local:31500/distributed/pytorch:v0.1.0
+    image: tuttlebr/distributed-pytorch:v0.1.0

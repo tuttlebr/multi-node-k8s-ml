@@ -3,7 +3,6 @@ kind: PersistentVolumeClaim
 metadata:
   annotations:
     "helm.sh/resource-policy": keep
-    "helm.sh/hook-delete-policy": hook-succeeded
   name: {{ .Values.appPrefix }}
   namespace: {{ .Release.Namespace }}
   labels:
